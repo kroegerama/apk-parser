@@ -55,7 +55,8 @@ public class XmlTranslator implements XmlStreamer {
     }
 
     private void onAttribute(Attribute attribute) {
-        sb.append(" ");
+        sb.append("\n");
+        appendShift(shift + 1);
         String namespace = this.namespaces.getPrefixViaUri(attribute.getNamespace());
         if (namespace == null) {
             namespace = attribute.getNamespace();
