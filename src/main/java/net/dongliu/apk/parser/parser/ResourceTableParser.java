@@ -6,13 +6,16 @@ import net.dongliu.apk.parser.struct.ChunkType;
 import net.dongliu.apk.parser.struct.StringPool;
 import net.dongliu.apk.parser.struct.StringPoolHeader;
 import net.dongliu.apk.parser.struct.resource.*;
+import net.dongliu.apk.parser.struct.resource.Type.EntryOffset;
 import net.dongliu.apk.parser.utils.Buffers;
 import net.dongliu.apk.parser.utils.Pair;
 import net.dongliu.apk.parser.utils.ParseUtils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -56,7 +59,7 @@ public class ResourceTableParser {
 
         resourceTable = new ResourceTable();
         resourceTable.setStringPool(stringPool);
-
+        
         if (resourceTableHeader.getPackageCount() != 0) {
             PackageHeader packageHeader = (PackageHeader) readChunkHeader();
             for (int i = 0; i < resourceTableHeader.getPackageCount(); i++) {
@@ -85,8 +88,7 @@ public class ResourceTableParser {
         //read key string pool
         if (packageHeader.getKeyStrings() > 0) {
             Buffers.position(buffer, beginPos + packageHeader.getKeyStrings() - packageHeader.getHeaderSize());
-            resourcePackage.setKeyStringPool(ParseUtils.readStringPool(buffer,
-                    (StringPoolHeader) readChunkHeader()));
+            resourcePackage.setKeyStringPool(ParseUtils.readStringPool(buffer,(StringPoolHeader) readChunkHeader()));
         }
 
 
@@ -116,14 +118,17 @@ public class ResourceTableParser {
                 case ChunkType.TABLE_TYPE:
                     TypeHeader typeHeader = (TypeHeader) chunkHeader;
                     // read offsets table
-                    long[] offsets = new long[(int) typeHeader.getEntryCount()];
+                    List<EntryOffset> offsets = new ArrayList<EntryOffset>();
+                    //long[] offsets = new long[(int) typeHeader.getEntryCount() + 2560];
                     for (int i = 0; i < typeHeader.getEntryCount(); i++) {
                         // as per frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h
-                        // the table type is FLAG_SPARSE or FLAG_OFFSET16
-                        if( (typeHeader.getFlags() & 0x02 ) == 0x02 ) /* FLAG_OFFSET16 */ {
-                            offsets[i] = Buffers.readUShort(buffer) * 4;
-                        } else {  /* FLAG_SPARSE */
-                            offsets[i] = Buffers.readUInt(buffer);
+                        // the table type is FLAG_SPARSE or FLAG_OFFSET16 or 0
+                        if( (typeHeader.getFlags() & 0x01 ) == 0x01 ) /* FLAG_SPARSE */ {
+                            offsets.add( new EntryOffset( Buffers.readUShort(buffer), Buffers.readUShort(buffer) * 4) );
+                        } else if( (typeHeader.getFlags() & 0x02 ) == 0x02 ) /* FLAG_OFFSET16 */ {
+                            offsets.add( new EntryOffset( i, Buffers.readUShort(buffer) * 4) );
+                        } else {  // no flags
+                            offsets.add( new EntryOffset( i, (int)Buffers.readUInt(buffer)));
                         }
                     }
 
@@ -238,7 +243,7 @@ public class ResourceTableParser {
         long beginPos = buffer.position();
         ResTableConfig config = new ResTableConfig();
         long size = Buffers.readUInt(buffer);
-
+        
         // imsi
         config.setMcc(buffer.getShort());
         config.setMnc(buffer.getShort());

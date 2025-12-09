@@ -6,6 +6,7 @@ import net.dongliu.apk.parser.utils.Buffers;
 import net.dongliu.apk.parser.utils.ParseUtils;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -13,6 +14,24 @@ import java.util.Locale;
  */
 public class Type {
 
+    public static class EntryOffset {
+        private final int idx;
+        private final int offset;
+
+        public EntryOffset(int idx, int offset) {
+            this.idx = idx;
+            this.offset = offset;
+        }
+
+        public int getIdx() {
+            return idx;
+        }
+
+        public int getOffset() {
+            return offset;
+        }
+    }
+    
     private String name;
     private short id;
 
@@ -20,7 +39,7 @@ public class Type {
 
     private StringPool keyStringPool;
     private ByteBuffer buffer;
-    private long[] offsets;
+    private List<EntryOffset> offsets;
     private StringPool stringPool;
 
     // see Densities.java for values
@@ -34,21 +53,29 @@ public class Type {
     }
 
     public ResourceEntry getResourceEntry(int resId) {
-        if (resId >= offsets.length) {
+        
+        EntryOffset entryOffset = null;
+        for( int i = 0; i < offsets.size(); i++ ) {
+            if( offsets.get(i).idx == resId ) {
+                entryOffset = offsets.get(i);
+                break;
+                
+            }
+        }
+        if (entryOffset == null) {
             return null;
         }
 
-        if (offsets[resId] == TypeHeader.NO_ENTRY) {
+        if (entryOffset.offset == TypeHeader.NO_ENTRY) {
             return null;
         }
        
-        if( offsets[resId] >= buffer.limit() ) {
-            //System.out.println( "invalid offset: " + offsets[resId] );
+        if( entryOffset.offset >= buffer.limit() ) {
             return null;
         }
 
         // read Resource Entries
-        Buffers.position(buffer, offsets[resId]);
+        Buffers.position(buffer, entryOffset.offset);
         return readResourceEntry();
     }
 
@@ -148,11 +175,11 @@ public class Type {
         this.buffer = buffer;
     }
 
-    public long[] getOffsets() {
+    public List<EntryOffset> getOffsets() {
         return offsets;
     }
 
-    public void setOffsets(long[] offsets) {
+    public void setOffsets(List<EntryOffset> offsets) {
         this.offsets = offsets;
     }
 
