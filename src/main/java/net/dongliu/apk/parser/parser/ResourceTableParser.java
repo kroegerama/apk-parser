@@ -95,6 +95,9 @@ public class ResourceTableParser {
         outer:
         while (buffer.hasRemaining()) {
             ChunkHeader chunkHeader = readChunkHeader();
+            if( chunkHeader == null ) {
+                continue;
+            }
             long chunkBegin = buffer.position();
             switch (chunkHeader.getChunkType()) {
                 case ChunkType.TABLE_TYPE_SPEC:
@@ -124,11 +127,11 @@ public class ResourceTableParser {
                         // as per frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h
                         // the table type is FLAG_SPARSE or FLAG_OFFSET16 or 0
                         if( (typeHeader.getFlags() & 0x01 ) == 0x01 ) /* FLAG_SPARSE */ {
-                            offsets.add( new EntryOffset( Buffers.readUShort(buffer), Buffers.readUShort(buffer) * 4) );
+                            offsets.add( new EntryOffset( buffer.getShort(), buffer.getShort() * 4) );
                         } else if( (typeHeader.getFlags() & 0x02 ) == 0x02 ) /* FLAG_OFFSET16 */ {
-                            offsets.add( new EntryOffset( i, Buffers.readUShort(buffer) * 4) );
+                            offsets.add( new EntryOffset( i, buffer.getShort() * 4) );
                         } else {  // no flags
-                            offsets.add( new EntryOffset( i, (int)Buffers.readUInt(buffer)));
+                            offsets.add( new EntryOffset( i, buffer.getInt()));
                         }
                     }
 
@@ -234,6 +237,12 @@ public class ResourceTableParser {
             case ChunkType.NULL:
                 Buffers.position(buffer, begin + headerSize);
                 return new NullHeader(headerSize, chunkSize);
+                
+            case ChunkType.TABLE_STAGED_ALIAS:
+                Buffers.position(buffer, begin + chunkSize);
+                return null;
+                
+                
             default:
                 throw new ParserException("Unexpected chunk Type: 0x" + Integer.toHexString(chunkType));
         }
