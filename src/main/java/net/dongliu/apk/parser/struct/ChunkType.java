@@ -33,4 +33,6 @@ public class ChunkType {
     public static final int TABLE_LIBRARY = 0x0203;
     //TODO: fix this later. Do not found definition for chunk type 0x0204 in android source yet...
     public static final int UNKNOWN_YET = 0x0204;
+    
+    public static final int TABLE_STAGED_ALIAS = 0x0206;
 }

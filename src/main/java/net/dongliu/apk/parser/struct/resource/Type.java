@@ -1,10 +1,12 @@
 package net.dongliu.apk.parser.struct.resource;
 
+import net.dongliu.apk.parser.struct.ResourceValue;
 import net.dongliu.apk.parser.struct.StringPool;
 import net.dongliu.apk.parser.utils.Buffers;
 import net.dongliu.apk.parser.utils.ParseUtils;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -12,6 +14,24 @@ import java.util.Locale;
  */
 public class Type {
 
+    public static class EntryOffset {
+        private final int idx;
+        private final int offset;
+
+        public EntryOffset(int idx, int offset) {
+            this.idx = idx;
+            this.offset = offset;
+        }
+
+        public int getIdx() {
+            return idx;
+        }
+
+        public int getOffset() {
+            return offset;
+        }
+    }
+    
     private String name;
     private short id;
 
@@ -19,7 +39,7 @@ public class Type {
 
     private StringPool keyStringPool;
     private ByteBuffer buffer;
-    private long[] offsets;
+    private List<EntryOffset> offsets;
     private StringPool stringPool;
 
     // see Densities.java for values
@@ -32,17 +52,30 @@ public class Type {
         this.density = config.getDensity();
     }
 
-    public ResourceEntry getResourceEntry(int id) {
-        if (id >= offsets.length) {
+    public ResourceEntry getResourceEntry(int resId) {
+        
+        EntryOffset entryOffset = null;
+        for( int i = 0; i < offsets.size(); i++ ) {
+            if( offsets.get(i).idx == resId ) {
+                entryOffset = offsets.get(i);
+                break;
+                
+            }
+        }
+        if (entryOffset == null) {
             return null;
         }
 
-        if (offsets[id] == TypeHeader.NO_ENTRY) {
+        if (entryOffset.offset == TypeHeader.NO_ENTRY) {
+            return null;
+        }
+       
+        if( entryOffset.offset >= buffer.limit() ) {
             return null;
         }
 
         // read Resource Entries
-        Buffers.position(buffer, offsets[id]);
+        Buffers.position(buffer, entryOffset.offset);
         return readResourceEntry();
     }
 
@@ -53,10 +86,11 @@ public class Type {
         resourceEntry.setSize(Buffers.readUShort(buffer));
         resourceEntry.setFlags(Buffers.readUShort(buffer));
         long keyRef = buffer.getInt();
-        String key = keyStringPool.get((int) keyRef);
-        resourceEntry.setKey(key);
 
         if ((resourceEntry.getFlags() & ResourceEntry.FLAG_COMPLEX) != 0) {
+            String key = keyStringPool.get((int) keyRef);
+            resourceEntry.setKey(key);
+
             ResourceMapEntry resourceMapEntry = new ResourceMapEntry(resourceEntry);
 
             // Resource identifier of the parent mapping, or 0 if there is none.
@@ -73,7 +107,13 @@ public class Type {
 
             resourceMapEntry.setResourceTableMaps(resourceTableMaps);
             return resourceMapEntry;
+        } else if ((resourceEntry.getFlags() & ResourceEntry.FLAG_COMPACT) != 0) {
+            resourceEntry.setValue(ResourceValue.string((int)keyRef, stringPool));
+            return resourceEntry;
         } else {
+            String key = keyStringPool.get((int) keyRef);
+            resourceEntry.setKey(key);
+
             Buffers.position(buffer, beginPos + resourceEntry.getSize());
             resourceEntry.setValue(ParseUtils.readResValue(buffer, stringPool));
             return resourceEntry;
@@ -135,11 +175,11 @@ public class Type {
         this.buffer = buffer;
     }
 
-    public long[] getOffsets() {
+    public List<EntryOffset> getOffsets() {
         return offsets;
     }
 
-    public void setOffsets(long[] offsets) {
+    public void setOffsets(List<EntryOffset> offsets) {
         this.offsets = offsets;
     }
 
